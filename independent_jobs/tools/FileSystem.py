@@ -42,6 +42,15 @@ class FileSystem(object):
         return fn
 
     @staticmethod
+    def isopen(fname):
+        if os.path.exists(fname):
+            try:
+                os.rename(fname,fname)
+                return False
+            except OSError:
+                return True
+
+    @staticmethod
     def delete_dir_failsafe(folder):
         try:
             shutil.rmtree(folder)

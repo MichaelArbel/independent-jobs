@@ -66,7 +66,7 @@ class SlurmComputationEngine(BatchClusterComputationEngine):
         if self.partition is not None:
             job_strings += ["#SBATCH --partition=%s" % self.partition]
         
-        job_strings += ["cd %s" % workdir]
+        #job_strings += ["cd %s" % workdir]
         job_strings += ["%s" % command]
         
         return os.linesep.join(job_strings)

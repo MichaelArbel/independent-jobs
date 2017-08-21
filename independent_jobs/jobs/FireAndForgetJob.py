@@ -17,11 +17,6 @@ if StrictVersion(pd.__version__) < StrictVersion(pd_version_at_least):
         "pandas version you are using (%s). Upgrade to at least %s to get "\
         "rid of this message." % (pd.__version__, pd_version_at_least)
 
-try:
-    import portalocker
-except ImportError:
-    logger.warning("portalocker not found, using non-exclusive file access")
-
 def store_results(fname, **kwargs):
     # create result dir if wanted
     if os.sep in fname:
@@ -36,48 +31,35 @@ def store_results(fname, **kwargs):
     columns = list(kwargs.keys())
     df = pd.DataFrame([[kwargs[k] for k in columns]], index=[current_time], columns=columns)
     
-    # check whether to append, re-write (since keys changed), or write from scratch
-    if os.path.exists(fname):
-        old_keys = pd.read_csv(fname, index_col=0, nrows=1).keys()
-        
-        if set(old_keys) == set(kwargs.keys()):
-            append = True
-        else:
-            old_df = pd.read_csv(fname, index_col=0, error_bad_lines=False)
-            df = old_df.append(df)
-            append = False
-    else:
-        append = False
-
-    if append:
-        with open(fname, 'a') as f:
-            if "portalocker" in sys.modules:
-                logger.info("Trying to lock %s" % fname)
-                portalocker.lock(f, portalocker.LOCK_EX)
-            df.to_csv(f, header=False)
-            if "portalocker" in sys.modules:
-                portalocker.unlock(f)
-                logger.info("Unlocking %s" % fname)
-    else:
-        with open(fname, 'w+') as f:
-            df.to_csv(f)
+    from sqlalchemy import create_engine
+    engine = create_engine('sqlite:///{}'.format(fname))
+    df = df.applymap(str)
+    df.to_sql("FireAndForgetJob", engine, if_exists="append")
+    
 
 def extract_array(fname, param_names, result_name="result",
                   non_existing=np.nan, redux_funs=[np.nanmean], return_param_values=True,
-                  conditionals={}):
+                  conditionals={}, db_is_sqlite=False):
     """
-    Given a csv file (as e.g. product by FireAndForgetJob, extraxts an
+    Given a database file (as e.g. product by FireAndForgetJob, extraxts an
     array where each dimension corresponds to a provided parameter, and
     each element is a redux (e.g. mean) of all results (of given same)
     for the parameter combinations.
     An optional set of additional conditions can be specified.
     
+    Database file can be csv or sqlite.
+    
     Empty parameter names lead to just aggregating (sliced by conditionals) the results.
     
     A default value can be specified.
     """
-    with open(fname) as f:
-        df = pd.read_csv(f, error_bad_lines=False, warn_bad_lines=False)
+    if db_is_sqlite:
+        from sqlalchemy import create_engine
+        engine = create_engine('sqlite:///{}'.format(fname))
+        df = pd.read_sql_table("FireAndForgetJob", engine)
+    else:
+        with open(fname) as f:
+            df = pd.read_csv(f, error_bad_lines=False, warn_bad_lines=False)
     
     for k, v in conditionals.items():
         df = df.loc[df[k] == v]
@@ -118,7 +100,8 @@ def extract_array(fname, param_names, result_name="result",
         return results, param_values
 
 def best_parameters(db_fname, param_names, result_name, selector=np.nanmin,
-                    redux_fun=np.nanmean, conditionals={}):
+                    redux_fun=np.nanmean, conditionals={},
+                    db_is_sqlite=False):
     """
     Extracts the best choice of parameters using @see extract_array
     """
@@ -126,7 +109,8 @@ def best_parameters(db_fname, param_names, result_name, selector=np.nanmin,
                             result_name=result_name,
                             param_names=param_names,
                             redux_funs=[redux_fun],
-                            conditionals=conditionals)
+                            conditionals=conditionals,
+                            db_is_sqlite=db_is_sqlite)
     
     results = results[0]
 
@@ -172,7 +156,7 @@ class FireAndForgetJob(IndependentJob):
         
         # the engine will not call this, as it "forgets"
         self.aggregator.clean_up()
-    
+
     def store_results(self, result, runtime):
         logger.info("Storing results in %s" % self.db_fname)
         submit_dict = {}

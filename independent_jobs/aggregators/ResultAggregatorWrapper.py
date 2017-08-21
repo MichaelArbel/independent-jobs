@@ -65,3 +65,6 @@ class ResultAggregatorWrapper(JobResultAggregator):
     def clean_up(self):
         if self.do_clean_up:
             FileSystem.delete_dir_failsafe(os.path.split(self.filename)[0])
+            #aa = os.path.split(self.filename)[0]
+            #aa =   os.path.split(aa)[0]
+            #FileSystem.delete_dir_failsafe(aa)
