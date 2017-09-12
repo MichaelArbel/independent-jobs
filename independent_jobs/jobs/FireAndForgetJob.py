@@ -17,7 +17,7 @@ if StrictVersion(pd.__version__) < StrictVersion(pd_version_at_least):
         "pandas version you are using (%s). Upgrade to at least %s to get "\
         "rid of this message." % (pd.__version__, pd_version_at_least)
 
-def store_results(fname, **kwargs):
+def store_results(fname,result, **kwargs):
     # create result dir if wanted
     if os.sep in fname:
         try:
@@ -32,10 +32,16 @@ def store_results(fname, **kwargs):
     df = pd.DataFrame([[kwargs[k] for k in columns]], index=[current_time], columns=columns)
     
     from sqlalchemy import create_engine
+    #import sqlalchemy as sa
     engine = create_engine('sqlite:///{}'.format(fname))
     df = df.applymap(str)
     df.to_sql("FireAndForgetJob", engine, if_exists="append")
-    
+    #results_dir = 'results/out'
+
+    #if not os.path.exists(results_dir):
+    #    os.makedirs(results_dir)
+    #np.save(os.path.join(results_dir, str(kwargs['_job_ID'])), result)
+
 
 def extract_array(fname, param_names, result_name="result",
                   non_existing=np.nan, redux_funs=[np.nanmean], return_param_values=True,
@@ -55,6 +61,7 @@ def extract_array(fname, param_names, result_name="result",
     """
     if db_is_sqlite:
         from sqlalchemy import create_engine
+        import sqlalchemy as sa
         engine = create_engine('sqlite:///{}'.format(fname))
         df = pd.read_sql_table("FireAndForgetJob", engine)
     else:
@@ -123,13 +130,17 @@ def best_parameters(db_fname, param_names, result_name, selector=np.nanmin,
     return best_params, selector(results)
 
 class FireAndForgetJob(IndependentJob):
-    def __init__(self, db_fname, result_name="result", seed=None, **param_dict):
+    def __init__(self, db_fname, result_name="result", job_ID = None, seed=None, **param_dict):
         IndependentJob.__init__(self, ScalarResultAggregator())
         
         self.db_fname = db_fname
         self.param_dict = param_dict
         self.result_name = result_name
         
+        if job_ID is None: 
+            job_ID = -1
+        self.job_ID = job_ID
+
         if seed is None:
             # if no seed is set unsigned 32bit int, and store
             seed = np.random.randint(2 ** 32 - 1)
@@ -159,10 +170,14 @@ class FireAndForgetJob(IndependentJob):
 
     def store_results(self, result, runtime):
         logger.info("Storing results in %s" % self.db_fname)
-        submit_dict = {}
+        submit_dict = result
         for k, v in self.param_dict.items():
             submit_dict[k] = v
-        submit_dict[self.result_name] = result
+
+        #submit_dict[self.result_name] = result
         submit_dict["_runtime"] = runtime
         submit_dict["_seed"] = self.seed
-        store_results(self.db_fname, **submit_dict)
+        submit_dict["_job_ID"] = self.job_ID
+        store_results(self.db_fname,result, **submit_dict)
+
+
