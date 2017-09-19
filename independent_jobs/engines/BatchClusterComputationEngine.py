@@ -33,7 +33,7 @@ class BatchClusterComputationEngine(IndependentComputationEngine):
     self_serialisation_fname = "serialised_engine.pkl"
     
     def __init__(self, batch_parameters, submission_cmd,
-                 check_interval=10, do_clean_up=False, submission_delay=0.5,
+                 check_interval=10, do_clean_up=False, submission_delay=2.,
                  max_jobs_in_queue=0):
         IndependentComputationEngine.__init__(self)
         
@@ -132,17 +132,19 @@ class BatchClusterComputationEngine(IndependentComputationEngine):
         f.close()
         
         job_id = self.submit_to_batch_system(job_string)
-        
+
         if job_id == "":
-            raise RuntimeError("Could not parse job_id. Something went wrong with the job submission")
+            #raise RuntimeError("Could not parse job_id. Something went wrong with the job submission")
+            print("could not submit job")
         
-        f = open(job_folder + os.sep + BatchClusterComputationEngine.job_id_filename, 'w')
-        f.write(job_id + os.linesep)
-        f.close()
-        
-        if not isinstance(wrapped_job, FireAndForgetJob):
+        else:
+            f = open(job_folder + os.sep + BatchClusterComputationEngine.job_id_filename, 'w')
+            f.write(job_id + os.linesep)
+            f.close()
+            
+            if not isinstance(wrapped_job, FireAndForgetJob):
             # track submitted (and unfinished) jobs and their start time
-            self._insert_job_time_sorted(job_name, job_id)
+                self._insert_job_time_sorted(job_name, job_id)
     
     @abstractmethod
     def submit_to_batch_system(self, job_string):
@@ -150,10 +152,18 @@ class BatchClusterComputationEngine(IndependentComputationEngine):
         outpipe, inpipe = popen2(self.submission_cmd)
         inpipe.write(job_string + os.linesep)
         inpipe.close()
-        
+#       num_trials = 10
         job_id = outpipe.read().strip()
+#        i = 0
+#        while job_id == "" and i < num_trials:
+#            time.sleep(1.)
+#            job_id = outpipe.read().strip()
+#            i = i+1 
+
+#        if job_id == "":
+#            raise RuntimeError("Could not parse job_id. Something went wrong with the job submission")
+
         outpipe.close()
-        
         return job_id
     
     def create_job_name(self):

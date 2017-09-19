@@ -5,6 +5,8 @@ from independent_jobs.engines.BatchClusterComputationEngine import BatchClusterC
 from independent_jobs.tools.Log import logger
 from independent_jobs.tools.Time import Time
 
+import time
+
 
 class SlurmComputationEngine(BatchClusterComputationEngine):
     def __init__(self, batch_parameters, check_interval=10, do_clean_up=False, partition=None):
@@ -73,11 +75,20 @@ class SlurmComputationEngine(BatchClusterComputationEngine):
 
     def submit_to_batch_system(self, job_string):
         # send job_string to batch command
+        num_max_trials = 10
+        i =0
         outpipe, inpipe = popen2.popen2(self.submission_cmd)
         inpipe.write(job_string + os.linesep)
         inpipe.close()
-        
         job_id = outpipe.read().strip().split(" ")[-1]
         outpipe.close()
+        while job_id == "" and i < num_max_trials:
+            time.sleep(2.)
+            outpipe, inpipe = popen2.popen2(self.submission_cmd)
+            inpipe.write(job_string + os.linesep)
+            inpipe.close()
+            job_id = outpipe.read().strip().split(" ")[-1]
+            outpipe.close()
+            i += 1
         
         return job_id
