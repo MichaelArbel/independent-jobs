@@ -17,7 +17,7 @@ if StrictVersion(pd.__version__) < StrictVersion(pd_version_at_least):
         "pandas version you are using (%s). Upgrade to at least %s to get "\
         "rid of this message." % (pd.__version__, pd_version_at_least)
 
-def store_results(fname,result, **kwargs):
+def store_results(fname,df):
     # create result dir if wanted
     if os.sep in fname:
         try:
@@ -27,15 +27,18 @@ def store_results(fname,result, **kwargs):
             pass
     
     # use current time as index for the dataframe
-    current_time = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
-    columns = list(kwargs.keys())
-    df = pd.DataFrame([[kwargs[k] for k in columns]], index=[current_time], columns=columns)
     
     from sqlalchemy import create_engine
     #import sqlalchemy as sa
     engine = create_engine('sqlite:///{}'.format(fname))
     df = df.applymap(str)
-    df.to_sql("FireAndForgetJob", engine, if_exists="append")
+    while True:
+        try:
+            df.to_sql("FireAndForgetJob", engine, if_exists="append")
+            break
+        except:
+            time.sleep(1.)
+            pass
     #results_dir = 'results/out'
 
     #if not os.path.exists(results_dir):
@@ -169,15 +172,45 @@ class FireAndForgetJob(IndependentJob):
         self.aggregator.clean_up()
 
     def store_results(self, result, runtime):
-        logger.info("Storing results in %s" % self.db_fname)
-        submit_dict = result
-        for k, v in self.param_dict.items():
-            submit_dict[k] = v
+        logger.info("Storing results in %s" % self.db_fname)  
+        if '_array' in result:
+            df = pd.DataFrame()
+            N_samples  = result['N_samples']
+            submit_dict = {}
+            del result['N_samples']
+            del result['_array']
+            keys = list(result.keys())
+            for k, v in self.param_dict.items():
+                submit_dict[k] = v
 
-        #submit_dict[self.result_name] = result
-        submit_dict["_runtime"] = runtime
-        submit_dict["_seed"] = self.seed
-        submit_dict["_job_ID"] = self.job_ID
-        store_results(self.db_fname,result, **submit_dict)
+            #submit_dict[self.result_name] = result
+            submit_dict["_runtime"] = runtime
+            submit_dict["_seed"] = self.seed
+            submit_dict["_job_ID"] = self.job_ID
+
+            current_time = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
+            columns = list(submit_dict.keys())
+            
+            for i in range(N_samples):
+                for key in keys:
+                    submit_dict[key] = result[key][i][0]
+                columns = list(submit_dict.keys())              
+                data = pd.DataFrame([[submit_dict[k] for k in columns]], index=[current_time], columns=columns)
+                df = df.append(data)
+        else:
+            submit_dict = result
+            for k, v in self.param_dict.items():
+                submit_dict[k] = v
+
+            #submit_dict[self.result_name] = result
+            submit_dict["_runtime"] = runtime
+            submit_dict["_seed"] = self.seed
+            submit_dict["_job_ID"] = self.job_ID
+
+            current_time = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
+            columns = list(submit_dict.keys())
+            df = pd.DataFrame([[submit_dict[k] for k in columns]], index=[current_time], columns=columns)
+
+        store_results(self.db_fname,df)
 
 
