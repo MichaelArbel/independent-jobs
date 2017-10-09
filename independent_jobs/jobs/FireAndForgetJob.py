@@ -174,14 +174,13 @@ class FireAndForgetJob(IndependentJob):
     def store_results(self, result, runtime):
         logger.info("Storing results in %s" % self.db_fname)  
         if '_array' in result:
-            df = pd.DataFrame()
             N_samples  = result['N_samples']
             submit_dict = {}
             del result['N_samples']
             del result['_array']
-            keys = list(result.keys())
+            submit_dict = result
             for k, v in self.param_dict.items():
-                submit_dict[k] = v
+                submit_dict[k] = str(v)
 
             #submit_dict[self.result_name] = result
             submit_dict["_runtime"] = runtime
@@ -189,14 +188,8 @@ class FireAndForgetJob(IndependentJob):
             submit_dict["_job_ID"] = self.job_ID
 
             current_time = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
-            columns = list(submit_dict.keys())
-            
-            for i in range(N_samples):
-                for key in keys:
-                    submit_dict[key] = result[key][i][0]
-                columns = list(submit_dict.keys())              
-                data = pd.DataFrame([[submit_dict[k] for k in columns]], index=[current_time], columns=columns)
-                df = df.append(data)
+            submit_dict["current_time"] = current_time
+            df = pd.DataFrame( submit_dict)
         else:
             submit_dict = result
             for k, v in self.param_dict.items():
