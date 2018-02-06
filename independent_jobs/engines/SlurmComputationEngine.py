@@ -9,7 +9,7 @@ import time
 
 
 class SlurmComputationEngine(BatchClusterComputationEngine):
-    def __init__(self, batch_parameters, check_interval=10, do_clean_up=False, partition=None):
+    def __init__(self, batch_parameters, check_interval=10, do_clean_up=False, partition=None, additional_input= ''):
         BatchClusterComputationEngine.__init__(self,
                                                batch_parameters=batch_parameters,
                                                check_interval=check_interval,
@@ -19,6 +19,7 @@ class SlurmComputationEngine(BatchClusterComputationEngine):
                                                max_jobs_in_queue=2000)
         
         self.partition=partition
+        self.additional_input = additional_input
 
     def _infer_slurm_qos(self, max_walltime, nodes):
         if max_walltime <= 60 * 60 and \
@@ -67,6 +68,8 @@ class SlurmComputationEngine(BatchClusterComputationEngine):
         
         if self.partition is not None:
             job_strings += ["#SBATCH --partition=%s" % self.partition]
+
+        job_strings += ["%s" %self.additional_input]
         
         #job_strings += ["cd %s" % workdir]
         job_strings += ["%s" % command]
