@@ -13,9 +13,9 @@ import pandas as pd
 
 pd_version_at_least="0.19.2"
 if StrictVersion(pd.__version__) < StrictVersion(pd_version_at_least):
-    print "Fire and forget functionality might be incompatible with the "\
-        "pandas version you are using (%s). Upgrade to at least %s to get "\
-        "rid of this message." % (pd.__version__, pd_version_at_least)
+    print("Fire and forget functionality might be incompatible with the ",
+        "pandas version you are using (",pd.__version__,"). Upgrade to at least ",pd_version_at_least," to get ",
+        "rid of this message." )
 
 def store_results(fname,df):
     # create result dir if wanted

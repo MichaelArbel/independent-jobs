@@ -26,14 +26,13 @@ class FileSystem(object):
         
         pipeoutput = subprocess.Popen("ls " + folder, shell=True, stdout=subprocess.PIPE)
         pipelines = pipeoutput.stdout.readlines()
-        
-        files = "".join(pipelines).split(os.linesep)
+        files = b''.join(pipelines).decode().split(os.linesep)
         return fname in files
 
     @staticmethod
     def get_unique_filename(filename_base):
         while True:
-            fn = filename_base + unicode(uuid.uuid4())
+            fn = filename_base + str(uuid.uuid4())
             try:
                 open(fn, "r").close()
             except IOError:

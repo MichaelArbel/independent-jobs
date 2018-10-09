@@ -2,7 +2,7 @@ from abc import abstractmethod
 from os import makedirs
 import os
 import pickle
-from popen2 import popen2
+import subprocess as sp
 import time
 
 from independent_jobs.aggregators.ResultAggregatorWrapper import ResultAggregatorWrapper
@@ -149,11 +149,13 @@ class BatchClusterComputationEngine(IndependentComputationEngine):
     @abstractmethod
     def submit_to_batch_system(self, job_string):
         # send job_string to batch command
-        outpipe, inpipe = popen2(self.submission_cmd)
-        inpipe.write(job_string + os.linesep)
+        p = sp.Popen(self.submission_cmd, shell=True, stdin=sp.PIPE, stdout=sp.PIPE, close_fds = True)
+        (outpipe, inpipe)  = (p.stdout, p.stdin)
+        tmp_string = job_string + os.linesep
+        inpipe.write(tmp_string.encode())
         inpipe.close()
 #       num_trials = 10
-        job_id = outpipe.read().strip()
+        job_id = outpipe.read().decode().strip()
 #        i = 0
 #        while job_id == "" and i < num_trials:
 #            time.sleep(1.)
@@ -170,7 +172,7 @@ class BatchClusterComputationEngine(IndependentComputationEngine):
         return FileSystem.get_unique_filename(self.batch_parameters.job_name_base)
     
     def save_all_job_list(self):
-        with open(self.self_serialisation_fname, "w+") as f:
+        with open(self.self_serialisation_fname, "w+b") as f:
             pickle.dump(self, f)
     
     def submit_job(self, job):

@@ -1,5 +1,7 @@
 import os
-import popen2
+#import popen as popen2
+import subprocess as sp
+
 
 from independent_jobs.engines.BatchClusterComputationEngine import BatchClusterComputationEngine
 from independent_jobs.tools.Log import logger
@@ -80,17 +82,26 @@ class SlurmComputationEngine(BatchClusterComputationEngine):
         # send job_string to batch command
         num_max_trials = 10
         i =0
-        outpipe, inpipe = popen2.popen2(self.submission_cmd)
-        inpipe.write(job_string + os.linesep)
+        #outpipe, inpipe = popen2.popen2(self.submission_cmd)
+        
+        p = sp.Popen(self.submission_cmd, shell=True, stdin=sp.PIPE, stdout=sp.PIPE, close_fds = True)
+        (outpipe, inpipe)  = (p.stdout, p.stdin) 
+
+        tmp_job_string = job_string + os.linesep
+
+        inpipe.write(tmp_job_string.encode())
         inpipe.close()
-        job_id = outpipe.read().strip().split(" ")[-1]
+        job_id = outpipe.read().decode().strip().split(" ")[-1]
         outpipe.close()
         while job_id == "" and i < num_max_trials:
             time.sleep(2.)
-            outpipe, inpipe = popen2.popen2(self.submission_cmd)
-            inpipe.write(job_string + os.linesep)
+            p = sp.Popen(self.submission_cmd, shell=True, stdin=sp.PIPE, stdout=sp.PIPE, close_fds = True)
+            (outpipe, inpipe)  = (p.stdout, p.stdin) 
+            #outpipe, inpipe = popen2.popen2(self.submission_cmd)
+            tmp_job_string = job_string + os.linesep
+            inpipe.write(tmp_job_string.encode())
             inpipe.close()
-            job_id = outpipe.read().strip().split(" ")[-1]
+            job_id = outpipe.read().decode().strip().split(" ")[-1]
             outpipe.close()
             i += 1
         
